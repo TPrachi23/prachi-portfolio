@@ -539,31 +539,259 @@
   </section>
 
   
-  <section class="section" id="games" aria-label="Games">
-    <div class="container">
-      <div class="section__head">
-        <h2>Play games</h2>
-        <p class="muted">Just for fun.</p>
+<section class="section" id="games" aria-label="Games">
+  <div class="container">
+    <div class="section__head">
+      <h2>Play games</h2>
+      <p class="muted">Two quick fun breaks.</p>
+    </div>
+
+    <div class="grid two">
+      <!-- Game 1: Rock Paper Scissors -->
+      <div class="card">
+        <h3>✊ Rock • Paper • Scissors</h3>
+        <p class="muted">Play vs computer — score is tracked.</p>
+
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;">
+          <button class="btn btn--ghost" type="button" onclick="rpsPlay('Rock')">Rock</button>
+          <button class="btn btn--ghost" type="button" onclick="rpsPlay('Paper')">Paper</button>
+          <button class="btn btn--ghost" type="button" onclick="rpsPlay('Scissors')">Scissors</button>
+          <button class="btn btn--ghost" type="button" onclick="rpsReset()">Reset</button>
+        </div>
+
+        <p id="rpsLine1" style="margin-top:10px;"></p>
+        <p id="rpsLine2" class="muted" style="margin-top:6px;"></p>
+
+        <div style="display:flex; gap:14px; flex-wrap:wrap; margin-top:10px;">
+          <span>Wins: <strong id="rpsWins">0</strong></span>
+          <span>Losses: <strong id="rpsLosses">0</strong></span>
+          <span>Ties: <strong id="rpsTies">0</strong></span>
+        </div>
       </div>
 
-      <div class="grid two">
-        <div class="card">
-          <h3>🎯 Click Counter</h3>
-          <button class="btn" onclick="incrementCounter()">Click me</button>
-          <p style="margin-top:10px;">Score: <strong><span id="clickCount">0</span></strong></p>
+      <!-- Game 2: Aim Trainer -->
+      <div class="card">
+        <h3>🎯 Aim Trainer</h3>
+        <p class="muted">Click targets fast — shows hits and time.</p>
+
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;">
+          <button class="btn" type="button" onclick="aimStart()">Start (10s)</button>
+          <button class="btn btn--ghost" type="button" onclick="aimReset()">Reset</button>
         </div>
 
-        <div class="card">
-          <h3>🎲 Guess the Number (1–10)</h3>
-          <input type="number" id="guessInput" min="1" max="10" />
-          <button class="btn btn--ghost" onclick="checkGuess()">Guess</button>
-          <p id="guessResult" style="margin-top:10px;"></p>
+        <div style="display:flex; gap:14px; flex-wrap:wrap; margin-top:10px;">
+          <span>Hits: <strong id="aimHits">0</strong></span>
+          <span>Time left: <strong id="aimTime">10.0</strong>s</span>
         </div>
+
+        <div
+          id="aimArena"
+          aria-label="Aim trainer arena"
+          style="
+            position: relative;
+            width: 100%;
+            max-width: 520px;
+            height: 240px;
+            margin-top: 12px;
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 12px;
+            overflow: hidden;
+            user-select: none;
+          "
+        >
+          <div
+            id="aimTarget"
+            role="button"
+            aria-label="Target"
+            tabindex="0"
+            onclick="aimHit()"
+            onkeydown="if(event.key==='Enter' || event.key===' ') aimHit()"
+            style="
+              position: absolute;
+              width: 44px;
+              height: 44px;
+              border-radius: 999px;
+              border: 2px solid rgba(255,255,255,0.35);
+              display: none;
+              cursor: pointer;
+            "
+          ></div>
+        </div>
+
+        <p id="aimResult" class="muted" style="margin-top:10px;"></p>
       </div>
     </div>
-  </section>
+  </div>
 
+  <script>
+    /* ------------------------------
+       Game 1: Rock • Paper • Scissors
+    --------------------------------*/
+    (function initRPS(){
+      const state = { wins: 0, losses: 0, ties: 0 };
+      const choices = ["Rock","Paper","Scissors"];
 
+      function setText(id, text){
+        const el = document.getElementById(id);
+        if(el) el.textContent = text;
+      }
+
+      function winner(player, cpu){
+        if(player === cpu) return "TIE";
+        if(
+          (player === "Rock" && cpu === "Scissors") ||
+          (player === "Paper" && cpu === "Rock") ||
+          (player === "Scissors" && cpu === "Paper")
+        ) return "WIN";
+        return "LOSS";
+      }
+
+      window.rpsPlay = function(playerChoice){
+        const cpuChoice = choices[Math.floor(Math.random()*3)];
+        const outcome = winner(playerChoice, cpuChoice);
+
+        if(outcome === "WIN") state.wins++;
+        else if(outcome === "LOSS") state.losses++;
+        else state.ties++;
+
+        setText("rpsLine1", `You: ${playerChoice} • Computer: ${cpuChoice}`);
+        setText("rpsLine2", outcome === "WIN" ? "✅ You win!" : outcome === "LOSS" ? "❌ You lose!" : "🤝 Tie!");
+
+        setText("rpsWins", String(state.wins));
+        setText("rpsLosses", String(state.losses));
+        setText("rpsTies", String(state.ties));
+      };
+
+      window.rpsReset = function(){
+        state.wins = 0; state.losses = 0; state.ties = 0;
+        setText("rpsLine1", "");
+        setText("rpsLine2", "");
+        setText("rpsWins", "0");
+        setText("rpsLosses", "0");
+        setText("rpsTies", "0");
+      };
+    })();
+
+    /* ------------------------------
+       Game 2: Aim Trainer (10 seconds)
+    --------------------------------*/
+    (function initAim(){
+      const state = {
+        running: false,
+        hits: 0,
+        durationMs: 10000,
+        startMs: 0,
+        rafId: null
+      };
+
+      function $(id){ return document.getElementById(id); }
+
+      function setText(id, txt){
+        const el = $(id);
+        if(el) el.textContent = txt;
+      }
+
+      function clamp(n, min, max){ return Math.max(min, Math.min(max, n)); }
+
+      function arenaBounds(){
+        const arena = $("aimArena");
+        if(!arena) return { w: 0, h: 0 };
+        return { w: arena.clientWidth, h: arena.clientHeight };
+      }
+
+      function moveTarget(){
+        const arena = $("aimArena");
+        const target = $("aimTarget");
+        if(!arena || !target) return;
+
+        const { w, h } = arenaBounds();
+        const size = target.offsetWidth || 44;
+
+        // keep target fully inside arena
+        const maxX = Math.max(0, w - size);
+        const maxY = Math.max(0, h - size);
+
+        const x = Math.floor(Math.random() * (maxX + 1));
+        const y = Math.floor(Math.random() * (maxY + 1));
+
+        target.style.left = x + "px";
+        target.style.top = y + "px";
+      }
+
+      function showTarget(show){
+        const target = $("aimTarget");
+        if(!target) return;
+        target.style.display = show ? "block" : "none";
+      }
+
+      function tick(){
+        if(!state.running) return;
+
+        const now = performance.now();
+        const elapsed = now - state.startMs;
+        const remaining = clamp(state.durationMs - elapsed, 0, state.durationMs);
+
+        setText("aimTime", (remaining/1000).toFixed(1));
+
+        if(remaining <= 0){
+          // stop
+          state.running = false;
+          showTarget(false);
+          cancelAnimationFrame(state.rafId);
+          state.rafId = null;
+
+          const score = state.hits;
+          setText("aimResult", `Time! Hits: ${score}.`);
+          return;
+        }
+
+        state.rafId = requestAnimationFrame(tick);
+      }
+
+      window.aimStart = function(){
+        // reset and start
+        state.running = true;
+        state.hits = 0;
+        state.startMs = performance.now();
+
+        setText("aimHits", "0");
+        setText("aimTime", "10.0");
+        setText("aimResult", "Go!");
+
+        showTarget(true);
+        moveTarget();
+
+        if(state.rafId) cancelAnimationFrame(state.rafId);
+        state.rafId = requestAnimationFrame(tick);
+      };
+
+      window.aimHit = function(){
+        if(!state.running) return;
+        state.hits++;
+        setText("aimHits", String(state.hits));
+        moveTarget();
+      };
+
+      window.aimReset = function(){
+        state.running = false;
+        state.hits = 0;
+
+        if(state.rafId) cancelAnimationFrame(state.rafId);
+        state.rafId = null;
+
+        setText("aimHits", "0");
+        setText("aimTime", "10.0");
+        setText("aimResult", "");
+        showTarget(false);
+      };
+
+      // If the arena is resized (responsive), keep target inside bounds next move
+      window.addEventListener("resize", function(){
+        if(state.running) moveTarget();
+      });
+    })();
+  </script>
+</section>
   <section class="section" id="contact" aria-label="Contact">
     <div class="container">
       <div class="section__head">
